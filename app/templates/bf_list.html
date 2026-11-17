@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>撤销补录档案 · {{ title }}</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/layout.css">
+  <link rel="stylesheet" href="/static/components.css">
+  <link rel="stylesheet" href="/static/backfill.css">
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">CALIBRATION<br>证书簿</div>
+    <nav>
+      {% for module in modules %}
+      <a href="/work/{{ loop.index }}{% if selected_root %}?run_id={{ selected_root }}{% endif %}"
+         class="{{ 'active' if stage == loop.index }}">{{ '%02d'|format(loop.index) }}．{{ module }}</a>
+      {% endfor %}
+      <a href="/revocations{% if selected_root %}?run_id={{ selected_root }}{% endif %}" class="active">补录档案</a>
+    </nav>
+    <small>FORM / C-07<br>本地离线 · 不接外部源</small>
+  </aside>
+  <div class="work">
+    <header class="topbar"><strong>标准器撤销补录档案</strong>
+      <a class="btn" href="/work/7{% if selected_root %}?run_id={{ selected_root }}{% endif %}">返回撤销复核</a>
+    </header>
+    <main class="content">
+      <section class="panel wide">
+        <div class="panel__head"><h2>补录记录</h2><span>{{ recs|length }} 条</span></div>
+        <div class="scroll">
+          {% if recs %}
+          <table>
+            <thead><tr><th>记录</th><th>原批次</th><th>标准器</th><th>生效日</th><th>状态</th>
+              <th>派生版本</th><th>错误</th><th>创建时间</th><th>证据</th></tr></thead>
+            <tbody>
+              {% for r in recs %}
+              <tr>
+                <td>{{ r.id }}</td>
+                <td><a href="/work/7?run_id={{ r.root_id }}">{{ r.root_id[:12] }}</a></td>
+                <td>{{ r.standard_id }}</td><td>{{ r.effective_date }}</td>
+                <td class="{{ 'sev--severe' if r.status != 'applied' else '' }}">{{ r.status }}</td>
+                <td>{{ r.derived_run_id or '—' }}</td>
+                <td title="{{ r.error or '' }}">{{ r.error or '' }}</td>
+                <td>{{ r.created_at }}</td>
+                <td><a href="/revocations/{{ r.id }}">查看</a>
+                  · <a href="/api/revocations/{{ r.id }}/evidence">JSON</a>
+                  · <a href="/api/revocations/{{ r.id }}/evidence.csv">CSV</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}<p class="empty">暂无补录记录。可在 M7 撤销复核页发起补录。</p>{% endif %}
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

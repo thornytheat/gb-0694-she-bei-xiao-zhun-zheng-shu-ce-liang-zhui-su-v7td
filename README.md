@@ -16,6 +16,10 @@ docker compose config --quiet
 
 打开 http://localhost:18208 。点击“运行样例”，或展开输入区提交CSV。切换七个模块查看计算依据。复核区可通过或退回，同一版本仅允许一次复核。证据CSV包含所有阶段与隔离行，批次内容不因复核变更。
 
+## 撤销补录（M7）
+
+标准器撤销事后补录时，不覆盖原批次，而是从原批次派生当前版本：生效日前的测量维持原判断，生效日起受影响设备拒用并生成重测去向。原批次的溯源路径、裁决与复核结论（decision/revision）原样保留；切换在单事务内完成，失败则当前指针仍指原批次。补录处理带逐项检查点，写入中断后重试只复用原记录、跳过已完成项续跑。入口在“撤销复核”页，证据页提供原路径、当前影响、去向三视图及JSON/CSV导出，证据哈希可离线复算。全部数据来自本地CSV与SQLite，不接外部源；`fault_plan`仅用于演示中断续跑。接口见docs/API.md，测试见tests/test_backfill.py。
+
 SQLite保存在命名卷records；容器重建保留历史。只在确认不再需要数据时执行 `docker compose down -v` 重建。端口可通过.env中的PORT调整。本地也可 `pip install -r requirements.txt` 后 `python -m app.main`。
 
 ## 定义与限制

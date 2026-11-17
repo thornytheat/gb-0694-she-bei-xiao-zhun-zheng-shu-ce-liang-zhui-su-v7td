@@ -1,2 +1,76 @@
 {% extends 'base.html' %}
-{% block stage_visual %}{% for r in current.rows %}<div class="chain-node"><b>{{r["撤销源"]}}</b><div>{{r["影响证书"]}}</div><small>{{r["拒用测量"]}} 条需重测</small></div>{% endfor %}{% endblock %}
+{% block stage_visual %}
+  {% for r in current.rows %}
+    <div class="chain-node">
+      <b>{{ r["撤销源"] }}{% if r.get("类型") == "补录" %}<span class="tag">补录</span>{% endif %}</b>
+      <div>{{ r["影响证书"] }}</div>
+      <small>{{ r["拒用测量"] }} 条需重测{% if r.get("生效日") %} · 生效日 {{ r["生效日"] }}{% endif %}</small>
+    </div>
+  {% endfor %}
+{% endblock %}
+{% block backfill %}
+<main class="content backfill-zone">
+  <section class="panel wide">
+    <div class="panel__head"><h2>撤销补录（补登标准器撤销，按生效日派生当前版本）</h2><span>M7 / BACKFILL</span></div>
+    <div class="panel__body">
+      <div class="actions">
+        <label>标准器证书
+          <select id="bf-standard">
+            {% for cert in backfill.certs %}<option value="{{ cert }}">{{ cert }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>生效日 <input id="bf-date" type="date" value="2026-06-01"></label>
+        <label>原因 <input id="bf-reason" type="text" placeholder="如：监督抽查发现超差" style="min-width:220px"></label>
+        <button class="primary" id="bf-submit">派生当前版本并重算</button>
+        <a class="btn" href="/revocations?run_id={{ backfill.root_id }}">补录档案页</a>
+      </div>
+      <p class="hint">生效日前测量维持原判断；生效日起受影响设备拒用并生成重测去向。原批次与复核证据不覆盖。</p>
+      <div class="error" id="bf-notice" role="status"></div>
+    </div>
+  </section>
+
+  <section class="panel wide">
+    <div class="panel__head"><h2>版本谱系与当前指针</h2><span>原批次 → 派生版本</span></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>版本批次</th><th>父版本</th><th>序号</th><th>当前</th><th>建立时间</th></tr></thead>
+        <tbody>
+          <tr><td>{{ backfill.root_id }}</td><td>—（原始批次）</td><td>0</td>
+            <td>{{ '是' if backfill.current_id == backfill.root_id else '' }}</td><td>{{ run.manifest.created_at }}</td></tr>
+          {% for v in backfill.versions %}
+          <tr><td><a href="/work/7?run_id={{ v.id }}">{{ v.id }}</a></td><td>{{ v.parent_id }}</td>
+            <td>r{{ v.seq }}</td><td>{{ '是' if v.is_current else '' }}</td><td>{{ v.created_at }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel wide">
+    <div class="panel__head"><h2>补录记录（重试只复用原版本；中断可续跑）</h2><span>{{ backfill.revocations|length }} 条</span></div>
+    <div class="scroll">
+      {% if backfill.revocations %}
+      <table>
+        <thead><tr><th>记录</th><th>标准器</th><th>生效日</th><th>状态</th><th>派生版本</th><th>错误</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for r in backfill.revocations %}
+          <tr>
+            <td><a href="/revocations/{{ r.id }}">{{ r.id[:10] }}</a></td>
+            <td>{{ r.standard_id }}</td><td>{{ r.effective_date }}</td>
+            <td class="{{ 'sev--severe' if r.status != 'applied' else '' }}">{{ r.status }}</td>
+            <td>{{ r.derived_run_id or '—' }}</td><td title="{{ r.error or '' }}">{{ r.error or '' }}</td>
+            <td class="actions">
+              {% if r.status != 'applied' %}<button data-resume="{{ r.id }}">续跑</button>{% endif %}
+              <a class="btn" href="/revocations/{{ r.id }}">证据</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="empty">暂无补录记录。</p>{% endif %}
+    </div>
+  </section>
+</main>
+<script defer src="/static/backfill.js"></script>
+<script id="bf-context" type="application/json">{{ {'root_id': backfill.root_id}|tojson }}</script>
+{% endblock %}

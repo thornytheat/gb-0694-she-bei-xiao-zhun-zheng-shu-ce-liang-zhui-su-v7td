@@ -13,6 +13,8 @@ from app.modules.m4_ranges.handler import bp as bp4
 from app.modules.m5_trace.handler import bp as bp5
 from app.modules.m6_verdict.handler import bp as bp6
 from app.modules.m7_revocation.handler import bp as bp7
+from app.backfill.handler import bp as bp_backfill
+from app.backfill.pages import bp as bp_backfill_pages
 app=Flask(__name__)
 app.config['MAX_CONTENT_LENGTH']=5*1024*1024
 app.json.ensure_ascii=False
@@ -32,6 +34,8 @@ app.register_blueprint(bp4)
 app.register_blueprint(bp5)
 app.register_blueprint(bp6)
 app.register_blueprint(bp7)
+app.register_blueprint(bp_backfill)
+app.register_blueprint(bp_backfill_pages)
 @app.before_request
 def validate_request_object():
     if request.method!='POST': return None

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>补录证据 {{ rec.id[:10] }} · {{ title }}</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/layout.css">
+  <link rel="stylesheet" href="/static/components.css">
+  <link rel="stylesheet" href="/static/backfill.css">
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">CALIBRATION<br>证书簿</div>
+    <nav>
+      {% for module in modules %}
+      <a href="/work/{{ loop.index }}?run_id={{ rec.root_id }}"
+         class="{{ 'active' if stage == loop.index }}">{{ '%02d'|format(loop.index) }}．{{ module }}</a>
+      {% endfor %}
+      <a href="/revocations?run_id={{ rec.root_id }}">补录档案</a>
+    </nav>
+    <small>FORM / C-07<br>本地离线 · 不接外部源</small>
+  </aside>
+  <div class="work">
+    <header class="topbar">
+      <strong>撤销补录证据 · {{ rec.standard_id }} / 生效日 {{ rec.effective_date }}</strong>
+      <a class="btn" href="/api/revocations/{{ rec.id }}/evidence">证据JSON</a>
+      <a class="btn" href="/api/revocations/{{ rec.id }}/evidence.csv">证据CSV</a>
+      <button id="print">打印</button>
+    </header>
+    <main class="content">
+      <section class="receipt">
+        <div class="receipt-heading"><b>补录复核单</b><span>{{ rec.id }}</span></div>
+        <div class="kpis">
+          <div class="kpi"><span>状态</span><b class="{{ 'sev--severe' if rec.status != 'applied' else '' }}">{{ rec.status }}</b></div>
+          <div class="kpi"><span>原批次（不可变）</span><b>{{ rec.root_id[:12] }}</b></div>
+          <div class="kpi"><span>当前指针</span><b>{{ current_id[:12] }}</b></div>
+          <div class="kpi"><span>派生版本</span><b>{{ (rec.derived_run_id or '未切换')[:12] }}</b></div>
+          <div class="kpi"><span>重测任务</span><b>{{ retests|length }} 条</b></div>
+        </div>
+        <p class="hint" style="margin-top:12px">
+          证据包 SHA256：<code>{{ bundle.bundle_sha256 }}</code>
+          {% if rec.status != 'applied' %}
+          <br>切换未完成：当前档案仍指向原批次，原复核证据（{{ base.decision }} / r{{ base.revision }}）继续可查。
+          <button class="primary" id="resume" style="margin-left:10px">续跑处理</button>
+          <span class="error" id="resume-notice"></span>
+          {% endif %}
+        </p>
+      </section>
+
+      <div class="panel-grid">
+        <section class="panel wide">
+          <div class="panel__head"><h2>视角一 · 原路径与原结论（冻结保留）</h2>
+            <span>原批次 {{ rec.root_id[:12] }} · {{ base.decision }} r{{ base.revision }}</span></div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>证书</th><th>原溯源路径</th><th>原链状态码</th><th>可追溯</th></tr></thead>
+              <tbody>
+                {% for cert, chain in bundle.original.chains.items() %}
+                <tr>
+                  <td>{{ cert }}</td><td class="left">{{ chain.path|join(' → ') }}</td>
+                  <td>{{ chain.code }}</td><td>{{ '是' if chain.valid else '否' }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel__head"><h2>视角二 · 当前影响（生效日重算）</h2>
+            <span>生效日前维持原判断 · 生效日起拒用</span></div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>证书</th><th>测量日</th><th>原结论</th><th>当前结论</th><th>当前原因码</th>
+                <th>生效日判断</th><th>原溯源路径</th></tr></thead>
+              <tbody>
+                {% if rec.derived_run_id and bundle.derived %}
+                {% for v in bundle.derived.verdicts %}
+                <tr class="{{ 'row-flagged' if 'BACKFILL_REVOKED' in v['原因码'] }}">
+                  <td>{{ v['证书'] }}</td><td>{{ v['测量日'] }}</td>
+                  <td>{{ v['原结论'] }}</td>
+                  <td class="{{ 'sev--severe' if v['结论'] == '拒用' else '' }}">{{ v['结论'] }}</td>
+                  <td>{{ v['原因码'] }}</td><td>{{ v['生效日判断'] }}</td>
+                  <td class="left">{{ v['原溯源路径'] }}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr><td colspan="7" class="empty">派生版本尚未生成（处理中断），续跑后展示。</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel__head"><h2>视角三 · 去向（重测处置跟踪）</h2>
+            <span>{{ retests|length }} 条</span></div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>任务</th><th>证书</th><th>设备</th><th>测量日</th><th>原结论</th>
+                <th>当前结论</th><th>去向</th><th>备注</th><th>处置</th></tr></thead>
+              <tbody>
+                {% for item in retests %}
+                <tr>
+                  <td>{{ item.id[:10] }}</td><td>{{ item.cert_id }}</td><td>{{ item.device }}</td>
+                  <td>{{ item.measured_at }}</td><td>{{ item.original_verdict }}</td>
+                  <td class="sev--severe">{{ item.current_verdict }}</td>
+                  <td id="dest-{{ item.id }}">{{ item.destination }}</td>
+                  <td class="left" id="note-{{ item.id }}">{{ item.note }}</td>
+                  <td class="actions">
+                    <select id="sel-{{ item.id }}">
+                      {% for d in destinations %}<option value="{{ d }}" {{ 'selected' if d == item.destination }}>{{ d }}</option>{% endfor %}
+                    </select>
+                    <button data-retest="{{ item.id }}">登记去向</button>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="empty">无重测任务。</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel__head"><h2>续跑日志（写入中断后按检查点续跑）</h2><span>{{ bundle.journal|length }} 项</span></div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>阶段</th><th>项目</th><th>状态</th><th>说明</th><th>时间</th></tr></thead>
+              <tbody>
+                {% for entry in bundle.journal %}
+                <tr>
+                  <td>{{ entry.stage }}</td><td>{{ entry.item_key }}</td>
+                  <td class="{{ 'sev--severe' if entry.status == 'blocked' else '' }}">{{ entry.status }}</td>
+                  <td class="left">{{ entry.detail }}</td><td>{{ entry.created_at }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="empty">暂无日志。</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<script id="bf-context" type="application/json">{{ {'revocation_id': rec.id}|tojson }}</script>
+<script defer src="/static/backfill.js"></script>
+</body>
+</html>
