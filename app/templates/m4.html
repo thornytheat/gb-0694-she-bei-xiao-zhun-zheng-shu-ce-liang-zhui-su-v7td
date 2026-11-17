@@ -1,0 +1,2 @@
+{% extends 'base.html' %}
+{% block stage_visual %}{% for item in run.verdicts[:5] %}<div class="chain-row"><span>{{item["证书"]}} / {{item["设备"]}}</span><b>{{item["结论"]}}</b></div>{% endfor %}{% endblock %}

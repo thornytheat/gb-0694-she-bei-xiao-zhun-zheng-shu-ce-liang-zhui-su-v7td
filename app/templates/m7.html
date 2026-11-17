@@ -1,0 +1,2 @@
+{% extends 'base.html' %}
+{% block stage_visual %}{% for r in current.rows %}<div class="chain-node"><b>{{r["撤销源"]}}</b><div>{{r["影响证书"]}}</div><small>{{r["拒用测量"]}} 条需重测</small></div>{% endfor %}{% endblock %}

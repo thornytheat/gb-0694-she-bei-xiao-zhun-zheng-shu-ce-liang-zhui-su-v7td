@@ -1,0 +1,2 @@
+{% extends 'base.html' %}
+{% block stage_visual %}{% for id,chain in run.chains.items() %}{% if loop.index<=5 %}<div class="chain-node"><b>{{id}}</b><div>{{chain.path|join(" → ")}}</div><small>{{chain.code}}</small></div>{% endif %}{% endfor %}{% endblock %}

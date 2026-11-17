@@ -1,0 +1,2 @@
+{% extends 'base.html' %}
+{% block stage_visual %}{% for item in run.verdicts if item["结论"]=="拒用" %}{% if loop.index<=5 %}<div class="chain-row"><span>{{item["证书"]}}</span>{{item["原因码"]}}</div>{% endif %}{% endfor %}{% endblock %}
